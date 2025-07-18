@@ -1,0 +1,28 @@
+{
+    "objects": [
+        {
+            "mass": 5.972e24,
+            "velocity": [0.0, 0.0, 0.0],
+            "density": 5514.0,
+            "dimensions": [5.0, 5.0, 5.0],
+            "position": [0.0, 0.0, 0.0],
+            "magnetic_field": 0.0,
+            "magnetic_axis": [0.0, 0.0, 1.0],
+            "angular_velocity": 0.01,
+            "rotation_axis": [0.0, 0.0, 1.0],
+            "color": [0.0, 0.5, 1.0]
+        },
+        {
+            "mass": 7.342e22,
+            "velocity": [0.0, 1.33e-3, 0.0],
+            "density": 3344.0,
+            "dimensions": [1.5, 1.5, 1.8],
+            "position": [10.0, 0.0, 0.0],
+            "magnetic_field": 0.0,
+            "magnetic_axis": [0.0, 0.0, 1.0],
+            "angular_velocity": 0.001,
+            "rotation_axis": [0.0, 0.0, 1.0],
+            "color": [0.7, 0.7, 0.7]
+        }
+    ]
+}

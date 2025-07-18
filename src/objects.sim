@@ -1,0 +1,76 @@
+{
+    "objects": [
+        {
+            "mass": 5.972e+20,
+            "velocity": [
+                -996472989.9999995,
+                0.0,
+                0.0
+            ],
+            "density": 5514.0,
+            "dimensions": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "position": [
+                -27701949114.999996,
+                0.0,
+                0.0
+            ],
+            "magnetic_field": 0.0,
+            "magnetic_axis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "angular_velocity": 0.01,
+            "rotation_axis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "color": [
+                0.0,
+                0.5,
+                1.0
+            ]
+        },
+        {
+            "mass": 5.972e+20,
+            "velocity": [
+                996472989.9999995,
+                0.0,
+                0.0
+            ],
+            "density": 5514.0,
+            "dimensions": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "position": [
+                27701949126.999996,
+                0.0,
+                0.0
+            ],
+            "magnetic_field": 0.0,
+            "magnetic_axis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "angular_velocity": 0.01,
+            "rotation_axis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "color": [
+                0.0,
+                0.5,
+                1.0
+            ]
+        }
+    ]
+}
