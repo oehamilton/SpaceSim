@@ -1,3 +1,5 @@
+## pip install 
+
 import numpy as np
 import pygame
 from OpenGL.GL import *
@@ -20,6 +22,12 @@ class ProlateSpheroid:
     magnetic_axis: np.ndarray  # Direction vector
     angular_velocity: float  # Rotation speed
     rotation_axis: np.ndarray  # Axis of rotation
+    color: np.ndarray = None  # RGB color (default to white if None)
+
+    def __post_init__(self):
+        # Set default color to white if not specified
+        if self.color is None:
+            self.color = np.array([1.0, 1.0, 1.0], dtype=np.float64)
 
     def update_position(self, dt):
         # Update position based on velocity and time step
@@ -29,7 +37,7 @@ class ProlateSpheroid:
         # Dynamic collision: Break into up to 10 fragments based on mass and velocity
         relative_velocity = np.linalg.norm(self.velocity - other.velocity)
         impact_energy = 0.5 * (self.mass * other.mass) * (relative_velocity ** 2)
-        threshold = 1e9  # Increased threshold to reduce collisions
+        threshold = 1e7  # Increased threshold to reduce collisions
         if impact_energy > threshold:
             fragments = min(10, int(impact_energy / threshold))
             fragment_mass = self.mass / fragments
@@ -45,7 +53,8 @@ class ProlateSpheroid:
                 magnetic_field=self.magnetic_field,
                 magnetic_axis=self.magnetic_axis,
                 angular_velocity=self.angular_velocity,
-                rotation_axis=self.rotation_axis
+                rotation_axis=self.rotation_axis,
+                color=self.color  # Inherit color from parent object
             ) for _ in range(fragments - 2)]
         return []
 
@@ -95,25 +104,30 @@ def setup_opengl():
     glEnable(GL_DEPTH_TEST)
     glEnable(GL_LIGHTING)
     glEnable(GL_LIGHT0)
-    # Set light position (move closer to the objects)
-    glLightfv(GL_LIGHT0, GL_POSITION, [0, 0, 2, 1])  # Position at (0, 0, 2) with w=1 (positional light)
-    # Set material properties
-    glMaterialfv(GL_FRONT, GL_DIFFUSE, [1.0, 0.5, 1.0, 1.0])  # White diffuse color
-    glMaterialfv(GL_FRONT, GL_SPECULAR, [1.0, 1.0, 1.0, 1.0])  # White specular color
-    glMaterialf(GL_FRONT, GL_SHININESS, 50.0)  # Shininess
-    gluPerspective(45, 1600/1200, 0.1, 500.0)
-    glTranslatef(0.0, 0.0, -2)  # Move camera closer (from -5 to -2)
+    glLightfv(GL_LIGHT0, GL_POSITION, [0, 0, 10, 1])  # Move light closer
+    glLightfv(GL_LIGHT0, GL_AMBIENT, [0.2, 0.2, 0.2, 1.0])
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, [1.0, 1.0, 1.0, 1.0])
+    glLightfv(GL_LIGHT0, GL_SPECULAR, [1.0, 1.0, 1.0, 1.0])
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, [1.0, 1.0, 1.0, 1.0])
+    glMaterialfv(GL_FRONT, GL_SPECULAR, [1.0, 1.0, 1.0, 1.0])
+    glMaterialf(GL_FRONT, GL_SHININESS, 50.0)
+    gluPerspective(45, 1600/1200, 0.1, 200.0)  # Reduce far plane for better precision
+    glTranslatef(0.0, 0.0, -65)  # Camera at z = -15 to view objects at x = 0 to 5
 
 def draw_prolate_spheroid(obj):
-    # Simplified rendering: Use a scaled sphere to approximate prolate spheroid
-    a, b, c = obj.dimensions  # a = b for prolate
+    a, b, c = obj.dimensions
+    print(f"Rendering object at {obj.position} with dimensions {obj.dimensions}, color {obj.color}, scale {a, b, c}")
     glPushMatrix()
     glTranslatef(*obj.position)
-    glScalef(a, b, c)  # Stretch sphere into prolate shape
+    glScalef(a, b, c)
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, list(obj.color) + [1.0])
+    glMaterialfv(GL_FRONT, GL_SPECULAR, [1.0, 1.0, 1.0, 1.0])
+    glMaterialf(GL_FRONT, GL_SHININESS, 50.0)
     quad = gluNewQuadric()
-    gluSphere(quad, 1.0, 20, 20)  # Increased radius to 1.0 for better visibility
+    gluSphere(quad, 1.0, 20, 20)
     gluDeleteQuadric(quad)
     glPopMatrix()
+    time.sleep(1)
 
 # Main Simulation Class
 class ProlateSimulation:
@@ -124,34 +138,34 @@ class ProlateSimulation:
         setup_opengl()
         self.objects = []
         self.paused = False
-        self.time_scale = 1.0  # Speed up/down with arrows
+        self.time_scale = 1e3  # Reduced for stability
         self.menu_open = False
-        self.load_simulation("objects.sim")  # Load default state
+        self.load_simulation("C:\Personal Files\OneDrive\Python\SpaceSim\objects.sim")
 
-    def add_object(self, mass, velocity, density, dimensions, position, magnetic_field, magnetic_axis, angular_velocity, rotation_axis):
+    def add_object(self, mass, velocity, density, dimensions, position, magnetic_field, magnetic_axis, angular_velocity, rotation_axis, color=None):
+        # Default to white if no color is specified
+        if color is None:
+            color = np.array([1.0, 1.0, 1.0], dtype=np.float64)  # White
         obj = ProlateSpheroid(mass, np.array(velocity, dtype=np.float64), density, dimensions, np.array(position, dtype=np.float64),
-                              magnetic_field, np.array(magnetic_axis, dtype=np.float64), angular_velocity, np.array(rotation_axis, dtype=np.float64))
+                              magnetic_field, np.array(magnetic_axis, dtype=np.float64), angular_velocity, np.array(rotation_axis, dtype=np.float64), color)
         self.objects.append(obj)
 
     def update(self, dt):
-        if not self.paused and len(self.objects) > 0:  # Check for non-empty object list
+        if not self.paused and len(self.objects) > 0:
             try:
-                # Prepare arrays for Numba
                 positions = np.atleast_2d([obj.position for obj in self.objects]).astype(np.float64)
                 velocities = np.atleast_2d([obj.velocity for obj in self.objects]).astype(np.float64)
                 masses = np.array([obj.mass for obj in self.objects], dtype=np.float64)
                 magnetic_fields = np.array([obj.magnetic_field for obj in self.objects], dtype=np.float64)
-
-                # Apply gravity and magnetic forces using Numba
+    
                 apply_gravity_numba(positions, velocities, masses, dt * self.time_scale)
-                apply_magnetic_force_numba(positions, velocities, magnetic_fields, masses, dt * self.time_scale)
-
-                # Update object velocities and positions
+                # Comment out magnetic forces to focus on gravitational orbits
+                # apply_magnetic_force_numba(positions, velocities, magnetic_fields, masses, dt * self.time_scale)
+    
                 for i, obj in enumerate(self.objects):
                     obj.velocity = velocities[i]
                     obj.update_position(dt * self.time_scale)
-
-                # Handle collisions
+    
                 new_objects = []
                 for i, obj in enumerate(self.objects):
                     for j, other in enumerate(self.objects[i+1:], start=i+1):
@@ -188,11 +202,17 @@ class ProlateSimulation:
         magnetic_axis = np.array([float(x) for x in input("Magnetic Axis (x,y,z): ").split(",")])
         angular_velocity = float(input("Angular Velocity: "))
         rotation_axis = np.array([float(x) for x in input("Rotation Axis (x,y,z): ").split(",")])
-        self.add_object(mass, velocity, density, dimensions, position, magnetic_field, magnetic_axis, angular_velocity, rotation_axis)
+        # Add color input
+        color_input = input("Color (r,g,b) or press Enter for default (white): ")
+        if color_input:
+            color = np.array([float(x) for x in color_input.split(",")], dtype=np.float64)
+        else:
+            color = None  # Default to white
+        self.add_object(mass, velocity, density, dimensions, position, magnetic_field, magnetic_axis, angular_velocity, rotation_axis, color)
         self.paused = False
         self.menu_open = False
 
-    def save_simulation(self, filename="objects.sim"):
+    def save_simulation(self, filename="C:\Personal Files\OneDrive\Python\SpaceSim\objects_save.sim"):
         data = {
             "objects": [
                 {
@@ -204,7 +224,8 @@ class ProlateSimulation:
                     "magnetic_field": obj.magnetic_field,
                     "magnetic_axis": obj.magnetic_axis.tolist(),
                     "angular_velocity": obj.angular_velocity,
-                    "rotation_axis": obj.rotation_axis.tolist()
+                    "rotation_axis": obj.rotation_axis.tolist(),
+                    "color": obj.color.tolist()  # Save the color
                 } for obj in self.objects
             ]
         }
@@ -221,6 +242,9 @@ class ProlateSimulation:
                 data = json.load(f)
                 self.objects = []
                 for obj_data in data["objects"]:
+                    color = np.array(obj_data.get("color", [128, 0, 0]), dtype=np.float64)
+                    #Loading objects with color
+                    print(f"Loading object with mass {obj_data['mass']} and color {color}")
                     self.add_object(
                         obj_data["mass"],
                         np.array(obj_data["velocity"], dtype=np.float64),
@@ -230,11 +254,11 @@ class ProlateSimulation:
                         obj_data["magnetic_field"],
                         np.array(obj_data["magnetic_axis"], dtype=np.float64),
                         obj_data["angular_velocity"],
-                        np.array(obj_data["rotation_axis"], dtype=np.float64)
+                        np.array(obj_data["rotation_axis"], dtype=np.float64),
+                        color
                     )
             print(f"Loaded {len(self.objects)} objects from {filename}")
         except (FileNotFoundError, json.JSONDecodeError):
-            # If the file doesn't exist or contains invalid JSON, start with an empty simulation
             self.objects = []
             print(f"Could not load {filename} (file not found or invalid JSON). Starting with empty simulation.")
 
@@ -243,7 +267,7 @@ class ProlateSimulation:
         running = True
         try:
             while running:
-                dt = clock.tick(60) / 1000.0  # Delta time in seconds
+                dt = min(clock.tick(60) / 1000.0, 0.0001)  # Cap dt at 0.01 seconds
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         running = False
@@ -257,35 +281,43 @@ class ProlateSimulation:
                             self.save_simulation()
                             running = False
                         elif event.key == pygame.K_n:
-                            self.objects = []  # New simulation
+                            self.objects = []
                         elif event.key == pygame.K_UP:
-                            self.time_scale *= 1.1  # Speed up
+                            self.time_scale *= 1.1
                         elif event.key == pygame.K_DOWN:
-                            self.time_scale /= 1.1  # Slow down
+                            self.time_scale /= 1.1
                         elif event.key == pygame.K_h:
                             print("Controls:\nM: Open menu\nP: Pause\nS: Save and stop\nN: New simulation\nUP/DOWN: Speed up/down\nH: Help")
-
+    
                 self.update(dt)
                 self.render()
+                #pause game loop for 5 seconds  
+                if self.menu_open:
+                    time.sleep(5)
+                self.menu_open = False  # Reset menu state after handling
+                    
+  
         finally:
-            pygame.quit()  # Ensure Pygame cleanup happens even if an exception occurs
+            pygame.quit()
 
 if __name__ == "__main__":
     print("Create Class")
     sim = ProlateSimulation()
     print("Create a default object")
-    # Add a test object to start with
+    # #Add a test object with a bright blue color
     # sim.add_object(
-    #     mass=1e5,
-    #     velocity=[0, 0, 0],
-    #     density=1000,
-    #     dimensions=(0.2, 0.2, 0.5),  # Prolate spheroid (a=b, c>a)
-    #     position=[0, 0, 0],
-    #     magnetic_field=0.1,
+    #     mass=1e3,
+    #     velocity=[0.01, 0.1, 0.1],
+    #     density=100,
+    #     dimensions=(0.2, 0.2, 0.2),  # Prolate spheroid (a=b, c>a)
+    #     position=[2, 0, 0],
+    #     magnetic_field=5.1,
     #     magnetic_axis=[0, 0, 1],
     #     angular_velocity=0.1,
-    #     rotation_axis=[0, 0, 1]
+    #     rotation_axis=[0, 1, 0],
+    #     color=np.array([0.0, 0.0, 1.0], dtype=np.float64)  # Bright blue
     # )
     sim.save_simulation()
     print("Run Simulation")
     sim.run()
+

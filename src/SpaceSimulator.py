@@ -265,6 +265,7 @@ class ProlateSimulation:
         try:
             while running:
                 dt = min(clock.tick(60) / 1000.0, 0.0001)  # Cap dt at 0.01 seconds
+                print(f"Delta Time: {dt:.6f} seconds, Time Scale: {self.time_scale:.2e}"    )
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         running = False
