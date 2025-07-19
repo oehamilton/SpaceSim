@@ -71,6 +71,10 @@ def apply_gravity_numba(positions, velocities, masses, dt, G=6.67430e-11):
                 r = np.sqrt(dx*dx + dy*dy + dz*dz)
                 if r > 0:
                     force = G * (masses[i] * masses[j]) / (r * r)
+                    #print(r)
+                    #force = np.clip(force, 0, 1e12)  # Limit force to prevent overflow
+                    #print(f"Force between objects {i} and {j}: {force:.2e} N")
+                    #print(f"Applying force {force} between objects {i} and {j}")
                     direction_x = dx / r
                     direction_y = dy / r
                     direction_z = dz / r
@@ -104,7 +108,7 @@ def setup_opengl():
     glEnable(GL_DEPTH_TEST)
     glEnable(GL_LIGHTING)
     glEnable(GL_LIGHT0)
-    glLightfv(GL_LIGHT0, GL_POSITION, [0, 0, 10, 1])  # Move light closer
+    glLightfv(GL_LIGHT0, GL_POSITION, [0, 10, 0, 1])  # Move light closer
     glLightfv(GL_LIGHT0, GL_AMBIENT, [0.2, 0.2, 0.2, 1.0])
     glLightfv(GL_LIGHT0, GL_DIFFUSE, [1.0, 1.0, 1.0, 1.0])
     glLightfv(GL_LIGHT0, GL_SPECULAR, [1.0, 1.0, 1.0, 1.0])
@@ -112,11 +116,13 @@ def setup_opengl():
     glMaterialfv(GL_FRONT, GL_SPECULAR, [1.0, 1.0, 1.0, 1.0])
     glMaterialf(GL_FRONT, GL_SHININESS, 50.0)
     gluPerspective(45, 1600/1200, 0.1, 200.0)  # Reduce far plane for better precision
-    glTranslatef(0.0, 0.0, -65)  # Camera at z = -15 to view objects at x = 0 to 5
+    glTranslatef(0.0, 0.0, -80)  # Camera at z = -15 to view objects at x = 0 to 5
 
 def draw_prolate_spheroid(obj):
     a, b, c = obj.dimensions
-    print(f"Rendering object at {obj.position} with dimensions {obj.dimensions}, color {obj.color}, scale {a, b, c}")
+    #Print object position and dimensions for debugging; round to 3 decimal places
+    
+    print(f"Rendering object at {np.round(obj.position,6)} with velocity {np.round(obj.velocity,6)}")
     glPushMatrix()
     glTranslatef(*obj.position)
     glScalef(a, b, c)
@@ -127,20 +133,39 @@ def draw_prolate_spheroid(obj):
     gluSphere(quad, 1.0, 20, 20)
     gluDeleteQuadric(quad)
     glPopMatrix()
-    time.sleep(1)
+    #time.sleep(0.1 )
+
+def render_text(text, x, y):
+    """Render text at screen coordinates (x, y) using orthographic projection."""
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    glOrtho(0, 1600, 0, 1200, -1, 1)  # Match window size 1600x1200
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+    glRasterPos2f(x, y)
+    glColor3f(1.0, 1.0, 1.0)  # White text
+    for char in text:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, ord(char))
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+    glPopMatrix()
 
 # Main Simulation Class
 class ProlateSimulation:
     def __init__(self):
         pygame.init()
+        glutInit()  # Initialize GLUT for text rendering
         self.display = (1600, 1200)
         self.screen = pygame.display.set_mode(self.display, pygame.OPENGL | pygame.DOUBLEBUF)
         setup_opengl()
         self.objects = []
         self.paused = False
-        self.time_scale = 1e3  # Reduced for stability
+        self.time_scale = 1  # Reduced for stability
         self.menu_open = False
-        self.load_simulation("C:\Personal Files\OneDrive\Python\SpaceSim\objects.sim")
+        self.load_simulation("D:\CODE\SpaceSim\src\objects.sim")
 
     def add_object(self, mass, velocity, density, dimensions, position, magnetic_field, magnetic_axis, angular_velocity, rotation_axis, color=None):
         # Default to white if no color is specified
@@ -181,6 +206,17 @@ class ProlateSimulation:
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             for obj in self.objects:
                 draw_prolate_spheroid(obj)
+
+
+            # Render position and velocity in top right corner
+            y_start = 1180  # Top of window (1200 - offset)
+            for i, obj in enumerate(self.objects, 1):
+                pos_str = f"Object {i}: Pos{np.round(obj.position, 3).tolist()}"
+                vel_str = f"Vel{np.round(obj.velocity, 3).tolist()}"
+                #print(f"{pos_str} {vel_str}")
+                render_text(pos_str, 1400, y_start - (i-1)*30)
+                render_text(vel_str, 1400, y_start - (i-1)*30 - 15)
+
             pygame.display.flip()
         except Exception as e:
             print(f"Error in render: {e}")
@@ -212,7 +248,7 @@ class ProlateSimulation:
         self.paused = False
         self.menu_open = False
 
-    def save_simulation(self, filename="C:\Personal Files\OneDrive\Python\SpaceSim\objects_save.sim"):
+    def save_simulation(self, filename="D:\CODE\SpaceSim\src\objects_save.sim"):
         data = {
             "objects": [
                 {
@@ -255,7 +291,7 @@ class ProlateSimulation:
                         np.array(obj_data["magnetic_axis"], dtype=np.float64),
                         obj_data["angular_velocity"],
                         np.array(obj_data["rotation_axis"], dtype=np.float64),
-                        color
+                        np.array(obj_data["color"] if "color" in obj_data else color, dtype=np.float64)  # Load color if available
                     )
             print(f"Loaded {len(self.objects)} objects from {filename}")
         except (FileNotFoundError, json.JSONDecodeError):
@@ -267,7 +303,8 @@ class ProlateSimulation:
         running = True
         try:
             while running:
-                dt = min(clock.tick(60) / 1000.0, 0.0001)  # Cap dt at 0.01 seconds
+                dt = min(clock.tick(60) / 1000.0, 0.01)  # Cap dt at 0.01 seconds
+                #print (f"Delta Time: {dt:.4f} seconds, Time Scale: {self.time_scale:.4f}")
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         running = False
